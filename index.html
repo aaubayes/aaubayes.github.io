@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" data-theme="light">
 <head>
@@ -461,6 +460,12 @@
     box-shadow: none;
     white-space: nowrap;
     transition: color .35s var(--ease), transform .35s var(--ease), opacity .35s var(--ease);
+  }
+  .hero-visual .formula .roman {
+    font-family: var(--sans);
+    font-size: .78em;
+    font-style: normal;
+    letter-spacing: 0;
   }
   .hero-visual .formula.is-active {
     transform: translateX(-50%) translateY(-2px) scale(1.03);
@@ -1517,7 +1522,7 @@
           </svg>
 
           <div class="formula" aria-hidden="true">
-            p(&theta; &mid; \text{data})
+            p(&theta; &mid; <span class="roman">data</span>)
           </div>
         </div>
       </div>
@@ -1591,12 +1596,16 @@
                   <label class="eyebrow" for="speakerNameInput">Speaker name and surname</label>
                   <input type="text" class="input-base" id="speakerNameInput" placeholder="e.g. Luca Rossi" />
                 </div>
+                <div class="proposal-field">
+                  <label class="eyebrow" for="speakerEmailInput">Speaker email</label>
+                  <input type="email" class="input-base" id="speakerEmailInput" placeholder="name.surname@aau.at" />
+                </div>
               </div>
               <p class="proposal-hint">Describe the topic or paper you want to put on the calendar, then add the speaker responsible for the session.</p>
             </div>
 
             <div class="step-nav">
-              <span class="small">Topic and speaker name are required to continue.</span>
+              <span class="small">Topic, speaker name, and speaker email are required to continue.</span>
               <button class="btn btn-primary" id="next1" disabled>
                 Continue to date <span aria-hidden="true">→</span>
               </button>
@@ -1726,19 +1735,20 @@
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
               </div>
-              <h3>Session <em>confirmed</em>.</h3>
+              <h3>Ready to <em>send</em>.</h3>
               <p class="sub">The event has been saved and added to the homepage cards.</p>
-              <p class="success-note">A ready-to-forward email draft is available for the organizer.</p>
+              <p class="success-note">Please send the announcement now, or go back and modify the session details.</p>
 
               <div class="success-actions">
-                <button class="btn btn-primary" id="openMailDraft">Open email draft</button>
+                <button class="btn btn-primary" id="sendAnnouncement">Send announcement</button>
+                <button class="btn btn-ghost" id="modifySession">Modify</button>
                 <button class="btn btn-primary" id="downloadIcs">Download .ics file</button>
                 <button class="btn btn-ghost" id="restart">Schedule another →</button>
               </div>
 
               <div id="successEventCard" style="max-width: 720px; margin: 0 auto 24px;"></div>
               <div class="success-summary" id="successSummary"></div>
-              <div class="mail-draft-panel" id="mailDraftPanel" hidden></div>
+              <div class="mail-draft-panel" id="mailStatusPanel" hidden></div>
             </div>
           </div>
         </div>
@@ -2162,6 +2172,7 @@ const state = {
   topic: null,
   customTopic: '',
   speakerName: '',
+  speakerEmail: '',
   organizerName: DEFAULT_ORGANIZER_NAME,
   organizerEmail: DEFAULT_ORGANIZER_EMAIL,
   date: null,
@@ -2178,7 +2189,7 @@ const selectionSummary = document.getElementById('selectionSummary');
 const selectedTopicCard = document.getElementById('selectedTopicCard');
 const savedEventsGrid = document.getElementById('savedEventsGrid');
 const successEventCard = document.getElementById('successEventCard');
-const mailDraftPanel = document.getElementById('mailDraftPanel');
+const mailStatusPanel = document.getElementById('mailStatusPanel');
 let latestMailPayload = null;
 
 function readEventsFromWindowName() {
@@ -2303,10 +2314,12 @@ function renderSelectedTopicCard() {
 
 const customInput = document.getElementById('customTopicInput');
 const speakerNameInput = document.getElementById('speakerNameInput');
+const speakerEmailInput = document.getElementById('speakerEmailInput');
 
 function syncProposalFields() {
   syncTopicDraft();
   state.speakerName = speakerNameInput.value.trim();
+  state.speakerEmail = speakerEmailInput.value.trim();
   state.organizerName = DEFAULT_ORGANIZER_NAME;
   state.organizerEmail = DEFAULT_ORGANIZER_EMAIL;
 }
@@ -2337,11 +2350,17 @@ speakerNameInput.addEventListener('input', e => {
   renderSelectedTopicCard();
   validateStep1();
 });
+speakerEmailInput.addEventListener('input', e => {
+  state.speakerEmail = e.target.value.trim();
+  renderSelectedTopicCard();
+  validateStep1();
+});
 function validateStep1() {
   syncProposalFields();
   document.getElementById('next1').disabled = !(
     state.topic &&
-    state.speakerName
+    state.speakerName &&
+    isValidEmail(state.speakerEmail)
   );
 }
 
@@ -2528,6 +2547,7 @@ function buildConfirmCard() {
       <div class="lbl">Speaker</div>
       <div class="val">
         <span class="big">${escapeHtml(state.speakerName)}</span>
+        <span class="mono small">${escapeHtml(state.speakerEmail)}</span>
       </div>
     </div>
     <div class="confirm-row">
@@ -2585,6 +2605,7 @@ function saveConfirmedEvent() {
     id: `event-${Date.now()}`,
     topic: state.topic.title,
     speakerName: state.speakerName,
+    speakerEmail: state.speakerEmail,
     organizerName: state.organizerName,
     organizerEmail: state.organizerEmail,
     date: state.date.toISOString(),
@@ -2616,6 +2637,7 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
     topic: state.topic.title,
     reading: state.topic.reading || '',
     speakerName: state.speakerName,
+    speakerEmail: state.speakerEmail,
     organizerName: state.organizerName,
     organizerEmail: state.organizerEmail,
     mailingListLabel: 'aau_baystat',
@@ -2639,6 +2661,7 @@ document.getElementById('confirmBtn').addEventListener('click', async () => {
 
   sum.innerHTML = `
     <div class="row"><span class="key">speaker</span><span>${escapeHtml(state.speakerName)}</span></div>
+    <div class="row"><span class="key">speaker email</span><span>${escapeHtml(state.speakerEmail)}</span></div>
     <div class="row"><span class="key">organizer</span><span>${escapeHtml(state.organizerName)}</span></div>
     <div class="row"><span class="key">organizer email</span><span>${escapeHtml(state.organizerEmail)}</span></div>
     <div class="row"><span class="key">topic</span><span>${escapeHtml(state.topic.title)}</span></div>
@@ -2699,6 +2722,7 @@ function buildDraftBody(payload) {
     '',
     `Topic: ${payload.topic}`,
     `Speaker: ${payload.speakerName}`,
+    `Speaker email: ${payload.speakerEmail}`,
     `Organizer: ${payload.organizerName} (${payload.organizerEmail})`,
     `Date: ${formatPayloadDate(payload)}`,
     `Time: ${payload.time} (${payload.duration} min)`,
@@ -2710,37 +2734,49 @@ function buildDraftBody(payload) {
     payload.organizerName
   ].filter(line => line !== '').join('\n');
 }
-function renderMailDraft(payload) {
-  if (!payload || !isValidEmail(payload.organizerEmail)) return;
+function showMailStatus(message, isError = false) {
+  mailStatusPanel.hidden = false;
+  mailStatusPanel.innerHTML = `
+    <h4>${isError ? 'Send blocked' : 'Announcement sent'}</h4>
+    <div class="mail-field">${escapeHtml(message)}</div>
+  `;
+}
+function sendAnnouncement(payload) {
+  if (!payload || !isValidEmail(payload.organizerEmail)) {
+    showMailStatus('The announcement could not be sent because the organizer email is missing.', true);
+    return;
+  }
 
   const subject = buildDraftSubject(payload);
   const body = buildDraftBody(payload);
-  mailDraftPanel.hidden = false;
-  mailDraftPanel.innerHTML = `
-    <h4>Email draft</h4>
-    <div class="mail-field">
-      <strong>To</strong>
-      ${escapeHtml(payload.organizerEmail)}
-    </div>
-    <div class="mail-field">
-      <strong>Subject</strong>
-      ${escapeHtml(subject)}
-    </div>
-    <form action="https://formsubmit.co/${escapeHtml(payload.organizerEmail)}" method="POST" target="_blank">
-      <input type="hidden" name="_subject" value="${escapeHtml(subject)}" />
-      <input type="hidden" name="_captcha" value="false" />
-      <input type="hidden" name="_template" value="table" />
-      <input type="hidden" name="topic" value="${escapeHtml(payload.topic)}" />
-      <input type="hidden" name="speaker" value="${escapeHtml(payload.speakerName)}" />
-      <input type="hidden" name="organizer" value="${escapeHtml(payload.organizerName)}" />
-      <input type="hidden" name="organizer_email" value="${escapeHtml(payload.organizerEmail)}" />
-      <textarea name="message">${escapeHtml(body)}</textarea>
-      <div class="draft-actions">
-        <button class="btn btn-primary" type="submit">Send via FormSubmit</button>
-      </div>
-    </form>
-  `;
-  mailDraftPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const form = document.createElement('form');
+  form.action = `https://formsubmit.co/${payload.organizerEmail}`;
+  form.method = 'POST';
+  form.target = '_blank';
+  form.style.display = 'none';
+
+  [
+    ['_subject', subject],
+    ['_captcha', 'false'],
+    ['_template', 'table'],
+    ['message', body],
+    ['topic', payload.topic],
+    ['speaker', payload.speakerName],
+    ['speaker_email', payload.speakerEmail],
+    ['organizer', payload.organizerName],
+    ['organizer_email', payload.organizerEmail]
+  ].forEach(([name, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = value || '';
+    form.appendChild(input);
+  });
+
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
+  showMailStatus(`Announcement sent to ${payload.organizerEmail}.`);
 }
 function buildICS() {
   const { start, end } = buildEventDates();
@@ -2793,8 +2829,11 @@ function downloadICS() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-document.getElementById('openMailDraft').addEventListener('click', () => {
-  renderMailDraft(latestMailPayload);
+document.getElementById('sendAnnouncement').addEventListener('click', () => {
+  sendAnnouncement(latestMailPayload);
+});
+document.getElementById('modifySession').addEventListener('click', () => {
+  goToStep(4);
 });
 document.getElementById('downloadIcs').addEventListener('click', downloadICS);
 document.getElementById('restart').addEventListener('click', () => {
@@ -2803,6 +2842,7 @@ document.getElementById('restart').addEventListener('click', () => {
     topic: null,
     customTopic: '',
     speakerName: '',
+    speakerEmail: '',
     organizerName: DEFAULT_ORGANIZER_NAME,
     organizerEmail: DEFAULT_ORGANIZER_EMAIL,
     date: null,
@@ -2817,6 +2857,7 @@ document.getElementById('restart').addEventListener('click', () => {
 
   customInput.value = '';
   speakerNameInput.value = '';
+  speakerEmailInput.value = '';
   document.getElementById('notesInput').value = '';
 
   document.querySelectorAll('#timeOptions .time-pill').forEach(p => p.classList.toggle('selected', p.dataset.time === '17:00'));
@@ -2824,8 +2865,8 @@ document.getElementById('restart').addEventListener('click', () => {
   document.querySelectorAll('.location-tile').forEach((t, i) => t.classList.toggle('selected', i === 0));
 
   latestMailPayload = null;
-  mailDraftPanel.hidden = true;
-  mailDraftPanel.innerHTML = '';
+  mailStatusPanel.hidden = true;
+  mailStatusPanel.innerHTML = '';
 
   validateStep1();
   validateStep2();
